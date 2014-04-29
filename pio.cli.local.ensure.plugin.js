@@ -6,6 +6,7 @@ const DNODE = require("dnode");
 const EVENTS = require("events");
 const Q = require("q");
 const UUID = require("uuid");
+const CRYPTO = require("crypto");
 
 
 var API = function(settings) {
@@ -13,7 +14,8 @@ var API = function(settings) {
 	self._settings = settings;
 
 	ASSERT.equal(typeof self._settings.hostname, "string");
-	ASSERT.equal(typeof self._settings.dnodePort, "number");
+    ASSERT.equal(typeof self._settings.dnodePort, "number");
+    ASSERT.equal(typeof self._settings.authCode, "string");
 
     self._dnodeClient = null;
     self._dnodeRemote = null;
@@ -133,13 +135,18 @@ API.prototype._call = function(method, args) {
         self._dnodeEvents.on("stderr", stderrListener);
         self._dnodeEvents.on("stdout", stdoutListener);
         args.$requestId = requestId;
-        self._dnodeRemote[method](args, function (errStack, response) {
+        args.$authCode = self._settings.authCode;
+        self._dnodeRemote[method](args, function (_err, response) {
             self._dnodeEvents.removeListener("stderr", stderrListener);
             self._dnodeEvents.removeListener("stdout", stdoutListener);
             startTimeout();
-            if (errStack) {
+            if (_err) {
+                if (_err.code === 403) {
+                    console.error(("Not authorized to access '" + self._settings.hostname + "' using dnode on port '" + self._settings.dnodePort + "'").red);
+                    return deferred.reject(new Error("Not authorized to access '" + self._settings.hostname + "' using dnode on port '" + self._settings.dnodePort + "'"));
+                }
                 var err = new Error("Got remote error: " + stderr.join(""));
-                err.stack = errStack;
+                err.stack = _err.stack || null;
                 return deferred.reject(err);
             }
             if (method === "_runCommands") {
@@ -218,9 +225,14 @@ exports.ensure = function(pio, state) {
 
         ASSERT(typeof pio.getConfig("config")["pio.deploy"].dnodePort === "number", "'config[pio.deploy].dnodePort' must be set to a number!");
 
+        var authCode = CRYPTO.createHash("sha1");
+        authCode.update(["auth-code", state.pio.instanceId, state.pio.instanceSecret].join(":"));
+
 	    var api = new API({
 	    	hostname: state["pio.vm"].ip || state["pio"].hostname,
-	    	dnodePort: pio.getConfig("config")["pio.deploy"].dnodePort
+	    	dnodePort: pio.getConfig("config")["pio.deploy"].dnodePort,
+            // TODO: Add salt that changes with every request.
+            authCode: authCode.digest("hex")
 	    });
 	    pio.once("shutdown", function() {
 			return api._shutdown();
