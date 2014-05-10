@@ -8,6 +8,7 @@ const CRYPTO = require("crypto");
 const EXEC = require("child_process").exec;
 const COLORS = require("colors");
 const JSON_DIFF_PATCH = require("jsondiffpatch");
+const ESCAPE_REGEXP = require("escape-regexp");
 
 
 COLORS.setTheme({
@@ -90,7 +91,33 @@ exports.deploy = function(pio, state) {
                         }
                     };
 
-                    console.log(("Deploy service '" + state["pio.service"].id + "' with config: " + JSON.stringify(serviceConfig, null, 4)).cyan);
+                    // TODO: Make this more generic.
+                    var sanitizedServiceConfig = JSON.stringify(serviceConfig, null, 4);
+                    var variables = [
+                        "AWS_USER_NAME",
+                        "AWS_ACCESS_KEY",
+                        "AWS_SECRET_KEY",
+                        "DNSIMPLE_EMAIL",
+                        "DNSIMPLE_TOKEN",
+                        "PIO_EPOCH_ID",
+                        "PIO_SEED_SALT",
+                        "PIO_SEED_KEY",
+                        "PIO_USER_ID",
+                        "PIO_USER_SECRET"
+                    ];
+                    for (var name in process.env) {
+                        variables.forEach(function(variable) {
+                            if (name.indexOf(variable) >= 0) {
+                                variables.push(name);
+                            }
+                        });
+                    }
+                    variables.forEach(function(name) {
+                        if (!process.env[name]) return;
+                        sanitizedServiceConfig = sanitizedServiceConfig.replace(new RegExp(ESCAPE_REGEXP(process.env[name]), "g"), process.env[name].substring(0, 3) + "***");
+                    });
+
+                    console.log(("Deploy service '" + state["pio.service"].id + "' with config: " + sanitizedServiceConfig).cyan);
 
                     return Q.denodeify(FS.outputFile)(PATH.join(state["pio.service"].path, ".pio.json"), JSON.stringify(serviceConfig, null, 4)).then(function() {
 
