@@ -193,7 +193,10 @@ exports.deploy = function(pio, state) {
                                     'fi',
                                     'if [ ! -f "' + state["pio.vm"].prefixPath + '/bin/activate.sh" ]; then',
                                     '  echo "#!/bin/sh -e\nexport PATH=' + state["pio.vm"].prefixPath + '/bin:$PATH\n" > ' + state["pio.vm"].prefixPath + '/bin/activate.sh',
-                                    'fi'
+                                    'fi',
+                                    // NOTE: When deploying as root we need to give the group write access to allow other processes to access the files.
+                                    // TODO: Narrow down file access by using different users and groups for different services depending on their relationships.
+                                    "sudo chmod -R g+wx " + state["pio.vm"].prefixPath
                                 ], "/").then(function() {
                                     return ensurePrerequisites(true);
                                 });
@@ -201,9 +204,14 @@ exports.deploy = function(pio, state) {
                             return runRemoteCommands([
                                     'if [ ! -d "' + state["pio.service.deployment"].path + '" ]; then',
                                     '  mkdir -p ' + state["pio.service.deployment"].path,
-                                    "  sudo chown -f " + state["pio.vm"].user + ":" + state["pio.vm"].user + " " + state["pio.service.deployment"].path,
+                                    "  chown -f " + state["pio.vm"].user + ":" + state["pio.vm"].user + " " + state["pio.service.deployment"].path,
+                                    // NOTE: When deploying as root we need to give the group write access to allow other processes to access the files.
+                                    // TODO: Narrow down file access by using different users and groups for different services depending on their relationships.
+                                    "  chmod -f g+wx " + state["pio.service.deployment"].path,
                                     'fi',
-                                    'chmod -Rf 744 "' + state["pio.service.deployment"].path + '/sync" || true',
+                                    // NOTE: When deploying as root we need to give the group write access to allow other processes to access the files.
+                                    // TODO: Narrow down file access by using different users and groups for different services depending on their relationships.
+                                    'chmod -f g+wx "' + state["pio.service.deployment"].path + '/sync" || true',
                                     'if [ ! -f /etc/profile.d/pio.sh ]; then echo "[pio:trigger-ensure-prerequisites]"; fi'
                             ], state["pio.vm"].prefixPath).then(function(response) {
                                 if (/\[pio:trigger-ensure-prerequisites\]/.test(response.stdout)) {
@@ -244,6 +252,9 @@ exports.deploy = function(pio, state) {
                             }
                             commands.push('export PIO_SCRIPTS_PATH="' + PATH.join(state["pio.service.deployment"].path, "sync/scripts") + '"');
                             commands.push('echo "Calling \'postdeploy.sh\' on VM (cwd: ' + state["pio.service.deployment"].path + '):"');
+                            // NOTE: When deploying as root we need to give the group write access to allow other processes to access the files.
+                            // TODO: Narrow down file access by using different users and groups for different services depending on their relationships.
+                            commands.push('chmod -Rf g+wx sync/scripts');
                             commands.push('sh sync/scripts/postdeploy.sh');
                             return runRemoteCommands(commands, state["pio.service.deployment"].path);
                         }
