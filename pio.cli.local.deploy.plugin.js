@@ -201,17 +201,21 @@ exports.deploy = function(pio, state) {
                                     return ensurePrerequisites(true);
                                 });
                             }
+                            var sudoCommand = "";
+                            if (state["pio.vm"].user !== "root") {
+                                sudoCommand = "sudo ";
+                            }
                             return runRemoteCommands([
                                     'if [ ! -d "' + state["pio.service.deployment"].path + '" ]; then',
-                                    '  mkdir -p ' + state["pio.service.deployment"].path,
-                                    "  chown -f " + state["pio.vm"].user + ":" + state["pio.vm"].user + " " + state["pio.service.deployment"].path,
+                                    '  ' + sudoCommand + 'mkdir -p ' + state["pio.service.deployment"].path,
+                                    "  " + sudoCommand + "chown -f " + state["pio.vm"].user + ":" + state["pio.vm"].user + " " + state["pio.service.deployment"].path,
                                     // NOTE: When deploying as root we need to give the group write access to allow other processes to access the files.
                                     // TODO: Narrow down file access by using different users and groups for different services depending on their relationships.
-                                    "  chmod -f g+wx " + state["pio.service.deployment"].path,
+                                    "  " + sudoCommand + "chmod -f g+wx " + state["pio.service.deployment"].path,
                                     'fi',
                                     // NOTE: When deploying as root we need to give the group write access to allow other processes to access the files.
                                     // TODO: Narrow down file access by using different users and groups for different services depending on their relationships.
-                                    'chmod -f g+wx "' + state["pio.service.deployment"].path + '/sync" || true',
+                                    sudoCommand + 'chmod -f g+wx "' + state["pio.service.deployment"].path + '/sync" || true',
                                     'if [ ! -f /etc/profile.d/pio.sh ]; then echo "[pio:trigger-ensure-prerequisites]"; fi'
                             ], state["pio.vm"].prefixPath).then(function(response) {
                                 if (/\[pio:trigger-ensure-prerequisites\]/.test(response.stdout)) {
@@ -346,7 +350,7 @@ exports.deploy = function(pio, state) {
                                 console.error(err.stack);
                                 throw new Error("We already tried to provision the prerequisites but that failed. You need to resolve manually!");
                             }
-                            return self._provisionPrerequisites().then(function() {
+                            return ensurePrerequisites().then(function() {
                                 state["pio.deploy"]._repeatAfterProvisionPrerequisites = true;
                                 return exports.deploy(pio, state);
                             });
