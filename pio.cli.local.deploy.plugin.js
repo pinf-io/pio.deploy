@@ -193,10 +193,12 @@ exports.deploy = function(pio, state) {
                                     'fi',
                                     'if [ ! -f "' + state["pio.vm"].prefixPath + '/bin/activate.sh" ]; then',
                                     '  echo "#!/bin/sh -e\nexport PATH=' + state["pio.vm"].prefixPath + '/bin:$PATH\n" > ' + state["pio.vm"].prefixPath + '/bin/activate.sh',
+                                    "  sudo chown -f " + state["pio.vm"].user + ":" + state["pio.vm"].user + " " + state["pio.vm"].prefixPath + '/bin/activate.sh',
                                     'fi',
+                                    "sudo chown -f " + state["pio.vm"].user + ":" + state["pio.vm"].user + " " + state["pio.vm"].prefixPath + '/*',
                                     // NOTE: When deploying as root we need to give the group write access to allow other processes to access the files.
                                     // TODO: Narrow down file access by using different users and groups for different services depending on their relationships.
-                                    "sudo chmod -R g+wx " + state["pio.vm"].prefixPath
+                                    "sudo chmod -Rf g+wx " + state["pio.vm"].prefixPath
                                 ], "/").then(function() {
                                     return ensurePrerequisites(true);
                                 });
