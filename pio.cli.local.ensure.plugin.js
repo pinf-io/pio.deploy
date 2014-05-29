@@ -136,43 +136,47 @@ API.prototype._call = function(method, args) {
         self._dnodeEvents.on("stdout", stdoutListener);
         args.$requestId = requestId;
         args.$authCode = self._settings.authCode;
-        self._dnodeRemote[method](args, function (_err, response) {
-            self._dnodeEvents.removeListener("stderr", stderrListener);
-            self._dnodeEvents.removeListener("stdout", stdoutListener);
-            startTimeout();
-            if (_err) {
-                if (_err.code === 403) {
-                    console.error(("Not authorized to access '" + self._settings.hostname + "' using dnode on port '" + self._settings.dnodePort + "'").red);
-                    return deferred.reject(new Error("Not authorized to access '" + self._settings.hostname + "' using dnode on port '" + self._settings.dnodePort + "'"));
-                }
-                var err = new Error("Got remote error: " + stderr.join(""));
-                err.stack = _err.stack || null;
-                return deferred.reject(err);
-            }
-            if (method === "_runCommands") {
-
-                response = {
-                    code: response,
-                    stdout: stdout.join(""),
-                    stderr: stderr.join(""),
-                    objects: {}
-                };
-
-                // TODO: Parse output in `stdoutListener` using streaming capability: https://github.com/olado/doT/issues/114
-                (function parse() {
-                    try {
-                        var re = /<wf\s+name\s*=\s*"([^"]+)"\s*>([\S\s]+?)<\s*\/wf\s*>/g;
-                        var m = null;
-                        while (m = re.exec(response.stdout)) {
-                            response.objects[m[1]] = JSON.parse(m[2]);
-                        }
-                    } catch(err) {
-                        return deferred.reject(err);
+        if (!self._dnodeRemote[method]) {
+            deferred.reject(new Error("There is no remote method called '" + method + "'!"));
+        } else {
+            self._dnodeRemote[method](args, function (_err, response) {
+                self._dnodeEvents.removeListener("stderr", stderrListener);
+                self._dnodeEvents.removeListener("stdout", stdoutListener);
+                startTimeout();
+                if (_err) {
+                    if (_err.code === 403) {
+                        console.error(("Not authorized to access '" + self._settings.hostname + "' using dnode on port '" + self._settings.dnodePort + "'").red);
+                        return deferred.reject(new Error("Not authorized to access '" + self._settings.hostname + "' using dnode on port '" + self._settings.dnodePort + "'"));
                     }
-                })();
-            }
-            return deferred.resolve(response);
-        });
+                    var err = new Error("Got remote error: " + stderr.join(""));
+                    err.stack = _err.stack || null;
+                    return deferred.reject(err);
+                }
+                if (method === "_runCommands") {
+
+                    response = {
+                        code: response,
+                        stdout: stdout.join(""),
+                        stderr: stderr.join(""),
+                        objects: {}
+                    };
+
+                    // TODO: Parse output in `stdoutListener` using streaming capability: https://github.com/olado/doT/issues/114
+                    (function parse() {
+                        try {
+                            var re = /<wf\s+name\s*=\s*"([^"]+)"\s*>([\S\s]+?)<\s*\/wf\s*>/g;
+                            var m = null;
+                            while (m = re.exec(response.stdout)) {
+                                response.objects[m[1]] = JSON.parse(m[2]);
+                            }
+                        } catch(err) {
+                            return deferred.reject(err);
+                        }
+                    })();
+                }
+                return deferred.resolve(response);
+            });
+        }
         return deferred.promise;
     }
     if (self._dnodeRemote) {
@@ -280,6 +284,13 @@ exports.ensure = function(pio, state) {
                     }).then(function(info) {
                         _response.remoteInfo = info;
                         return;
+                    }).fail(function(err) {
+                        if (state["pio.cli.local"].force) {
+                            console.error("Got error but ignoring due to FORCE:", err.stack);
+                            return;
+                        }
+                        console.error("\nACTION: You may need to `pio deploy pio.server -f` to fix this!\n".magenta);
+                        throw err;
                     });
                 });
             }
