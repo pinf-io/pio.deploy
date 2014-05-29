@@ -275,7 +275,7 @@ exports.ensure = function(pio, state) {
                     api.getCachedFileInfo = function () {
                         return pio.API.Q.resolve(_cache);
                     }
-                    return api._call("info", {
+                    return api._call("config", {
                         "servicePath": state["pio.service.deployment"].path
                     }).then(function(info) {
                         _response.remoteInfo = info;
