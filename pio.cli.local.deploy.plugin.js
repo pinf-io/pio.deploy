@@ -19,7 +19,7 @@ COLORS.setTheme({
 exports.deploy = function(pio, state) {
 
     var response = {
-        status: "unknown"
+        ".status": "unknown"
     };
 
     return pio.API.Q.fcall(function() {
@@ -74,7 +74,7 @@ exports.deploy = function(pio, state) {
                             console.log(("Skip deploy service '" + state["pio.service"].id + "'. It has not changed. BUT CONTINUE due to 'state[pio.cli.local].force'").yellow);
                         } else {
                             console.log(("Skip deploy service '" + state["pio.service"].id + "'. It has not changed.").yellow);
-                            response.status = "skipped";
+                            response[".status"] = "skipped";
                             return;
                         }
                     }
@@ -279,7 +279,7 @@ exports.deploy = function(pio, state) {
                                 console.log("Reconnecting to pio server...");
                                 function reconnect() {
                                     return pio._state["pio.deploy"]._reconnect().then(function(status) {
-                                        if (status.status === "ready") {
+                                        if (status[".status"] === "ready") {
                                             return;
                                         }
                                         console.log("Warning: Reconnect failed");
@@ -366,7 +366,7 @@ exports.deploy = function(pio, state) {
 
                     }).then(function() {
 
-                        response.status = "done";
+                        response[".status"] = "done";
                     });
                 });
             }

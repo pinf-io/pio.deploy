@@ -60,7 +60,7 @@ API.prototype._ensure = function() {
 		return Q.fcall(function() {
 			return {
 	    		dnodeAvailable: true,
-	    		status: "ready"
+	    		".status": "ready"
 			};
 		});
 	}
@@ -68,12 +68,12 @@ API.prototype._ensure = function() {
     	if (canConnect) {
     		return {
 	    		dnodeAvailable: true,
-	    		status: "ready"
+	    		".status": "ready"
     		};
     	} else {
     		return {
 	    		required: false,
-	    		status: "waiting"
+	    		".status": "waiting"
     		};
     	}
 	});
@@ -217,7 +217,7 @@ API.prototype._call = function(method, args) {
 exports.ensure = function(pio, state) {
 
     var response = {
-        status: "unknown"
+        ".status": "unknown"
     };
 
     return pio.API.Q.fcall(function() {
@@ -342,7 +342,7 @@ exports.ensure = function(pio, state) {
 		});
 
     }).then(function() {
-        response.status = "ready";
+        response[".status"] = "ready";
 
         return pio.API.Q.resolve({
             "pio.deploy": response
