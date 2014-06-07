@@ -71,9 +71,13 @@ exports.deploy = function(pio, state) {
 
                     if (!deploy) {
                         if (state["pio.cli.local"].force) {
-                            console.log(("Skip deploy service '" + state["pio.service"].id + "'. It has not changed. BUT CONTINUE due to 'state[pio.cli.local].force'").yellow);
+                            if (state["pio.cli.local"].verbose) {
+                                console.log(("Skip deploy service '" + state["pio.service"].id + "'. It has not changed. BUT CONTINUE due to 'state[pio.cli.local].force'").yellow);
+                            }
                         } else {
-                            console.log(("Skip deploy service '" + state["pio.service"].id + "'. It has not changed.").yellow);
+                            if (state["pio.cli.local"].verbose) {
+                                console.log(("Skip deploy service '" + state["pio.service"].id + "'. It has not changed.").yellow);
+                            }
                             response[".status"] = "skipped";
                             return;
                         }
@@ -117,7 +121,9 @@ exports.deploy = function(pio, state) {
                         sanitizedServiceConfig = sanitizedServiceConfig.replace(new RegExp(ESCAPE_REGEXP(process.env[name]), "g"), process.env[name].substring(0, 3) + "***");
                     });
 
-                    console.log(("Deploy service '" + state["pio.service"].id + "' with config: " + sanitizedServiceConfig).cyan);
+                    if (state["pio.cli.local"].verbose) {
+                        console.log(("Deploy service '" + state["pio.service"].id + "' with config: " + sanitizedServiceConfig).cyan);
+                    }
 
                     return Q.denodeify(FS.outputFile)(PATH.join(state["pio.service"].path, ".pio.json"), JSON.stringify(serviceConfig, null, 4)).then(function() {
 
@@ -138,7 +144,9 @@ exports.deploy = function(pio, state) {
                         }
 
                         function runRemoteCommands(commands, workingDirectory) {
-                            console.log(("Running remote commands '" + commands.join("; ") + "' in '" + workingDirectory + "'.").magenta);
+                            if (state["pio.cli.local"].verbose) {
+                                console.log(("Running remote commands '" + commands.join("; ") + "' in '" + workingDirectory + "'.").magenta);
+                            }
                             function sshUpload() {
                                 return pio.API.SSH.runRemoteCommands({
                                     targetUser: state["pio.vm"].user,
@@ -235,7 +243,9 @@ exports.deploy = function(pio, state) {
                             // TODO: Use walker to get file list using sane deploy ignore rules.
                             //       Feed file list to rsync.
                             var deployIgnoreRulesPath = PATH.join(state["pio.service"].path, "source/.deployignore");
-                            console.log("Looking for rsync ignore rules at: " + deployIgnoreRulesPath)
+                            if (state["pio.cli.local"].verbose) {
+                                console.log("Looking for rsync ignore rules at: " + deployIgnoreRulesPath);
+                            }
                             return pio.API.RSYNC.sync({
                                 sourcePath: state["pio.service"].path,
                                 targetUser: state["pio.vm"].user,
@@ -271,12 +281,16 @@ exports.deploy = function(pio, state) {
                             return triggerPostdeploy();
                         }).then(function() {
 
-                            console.log("Deploy done!");
+                            if (state["pio.cli.local"].verbose) {
+                                console.log("Deploy done!");
+                            }
 
                             // NOTE: If deploying the `pio.server` we now need to reset out
                             //       connection to the server.
                             if (state["pio.service"].id === "pio.server") {
-                                console.log("Reconnecting to pio server...");
+                                if (state["pio.cli.local"].verbose) {
+                                    console.log("Reconnecting to pio server...");
+                                }
                                 function reconnect() {
                                     return pio._state["pio.deploy"]._reconnect().then(function(status) {
                                         if (status[".status"] === "ready") {
@@ -290,7 +304,9 @@ exports.deploy = function(pio, state) {
                                     });
                                 }
                                 return Q.timeout(reconnect(), 10 * 1000).then(function() {
-                                    console.log("Reconnect done!");
+                                    if (state["pio.cli.local"].verbose) {
+                                        console.log("Reconnect done!");
+                                    }
                                 }).fail(function(err) {
                                     console.error("Error reconnecting!");
                                     throw err;
@@ -347,7 +363,9 @@ exports.deploy = function(pio, state) {
 
                     }).fail(function(err) {
                         if (/\/opt\/bin\/activate\.sh: No such file or directory/.test(err.message)) {
-                            console.log(("Looks like /opt/bin/activate.sh does not exist on instance. Let's create it along with other prerequisites.").magenta);
+                            if (state["pio.cli.local"].verbose) {
+                                console.log(("Looks like /opt/bin/activate.sh does not exist on instance. Let's create it along with other prerequisites.").magenta);
+                            }
                             if (state["pio.deploy"]._repeatAfterProvisionPrerequisites) {
                                 console.error(err.stack);
                                 throw new Error("We already tried to provision the prerequisites but that failed. You need to resolve manually!");

@@ -329,7 +329,9 @@ exports.ensure = function(pio, state) {
                     if (remoteInfo.config["pio.service"].originalChecksum === state["pio.service"].originalChecksum) {
                         return true;
                     }
-                    console.log(("Original checksum has changed! (local " + state["pio.service"].originalChecksum + " != " + remoteInfo.config["pio.service"].originalChecksum + " remote)").cyan);
+                    if (state["pio.cli.local"].verbose) {
+                        console.log(("Original checksum has changed! (local " + state["pio.service"].originalChecksum + " != " + remoteInfo.config["pio.service"].originalChecksum + " remote)").cyan);
+                    }
                     return false;
 
 // TODO: If service is in read mode 0444, don't need to scan source, can just use cached checksum.
