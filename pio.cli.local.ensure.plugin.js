@@ -7,6 +7,7 @@ const EVENTS = require("events");
 const Q = require("q");
 const UUID = require("uuid");
 const CRYPTO = require("crypto");
+const DEEPEQUAL = require("deepequal");
 
 
 var API = function(settings) {
@@ -307,6 +308,28 @@ exports.ensure = function(pio, state) {
     	    	response = new Res(pio.API.DEEPMERGE(response, _response));
                 response.isSynced = function(state) {
                     var remoteInfo = response._remoteInfo;
+
+                    if (
+                        state["pio.service"].config["smi.cli"] &&
+                        state["pio.service"].config["smi.cli"].aspects
+                    ) {
+                        if (
+                            !remoteInfo.config["pio.service"].config ||
+                            !remoteInfo.config["pio.service"].config["smi.cli"] ||
+                            !remoteInfo.config["pio.service"].config["smi.cli"].aspects
+                        ) {
+                            console.log(("Catalog uris locally but not remote").cyan);
+                            return false;
+                        }
+                        if (!DEEPEQUAL(
+                            state["pio.service"].config["smi.cli"].aspects,
+                            remoteInfo.config["pio.service"].config["smi.cli"].aspects
+                        )) {
+                            console.log(("Catalog uris changed").cyan);
+                            return false;
+                        }
+                    }
+
                     if (
                         !remoteInfo ||
                         !remoteInfo.config ||
