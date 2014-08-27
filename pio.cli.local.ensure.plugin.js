@@ -321,10 +321,18 @@ exports.ensure = function(pio, state) {
                             console.log(("Catalog uris locally but not remote").cyan);
                             return false;
                         }
+                        var localAspects = JSON.stringify(state["pio.service"].config["smi.cli"].aspects);
+                        // TODO: Parse locator properly instead of replacing string.
+                        localAspects = JSON.parse(localAspects.replace(/\?[^"]+"/g, '"'));
+                        var remoteAspects = JSON.stringify(remoteInfo.config["pio.service"].config["smi.cli"].aspects);
+                        // TODO: Parse locator properly instead of replacing string.
+                        remoteAspects = JSON.parse(remoteAspects.replace(/\?[^"]+"/g, '"'));
                         if (!DEEPEQUAL(
-                            state["pio.service"].config["smi.cli"].aspects,
-                            remoteInfo.config["pio.service"].config["smi.cli"].aspects
+                            localAspects,
+                            remoteAspects
                         )) {
+                            console.log("localAspects", JSON.stringify(localAspects, null, 4));
+                            console.log("remoteAspects", JSON.stringify(remoteAspects, null, 4));
                             console.log(("Catalog uris changed").cyan);
                             return false;
                         }
