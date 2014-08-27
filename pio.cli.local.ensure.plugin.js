@@ -314,6 +314,9 @@ exports.ensure = function(pio, state) {
                         state["pio.service"].config["smi.cli"].aspects
                     ) {
                         if (
+                            !remoteInfo ||
+                            !remoteInfo.config ||
+                            !remoteInfo.config["pio.service"] ||
                             !remoteInfo.config["pio.service"].config ||
                             !remoteInfo.config["pio.service"].config["smi.cli"] ||
                             !remoteInfo.config["pio.service"].config["smi.cli"].aspects
