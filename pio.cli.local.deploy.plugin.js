@@ -275,6 +275,9 @@ exports.deploy = function(pio, state) {
                             if (state["pio.cli.local"].silent) {
                                 commands.push('export PIO_SILENT=' + state["pio.cli.local"].silent);
                             }
+                            if (state["pio.cli.local"].buildCache === false) {
+                                commands.push('export PIO_BUILD_CACHE=false');
+                            }
                             commands.push('export PIO_SCRIPTS_PATH="' + PATH.join(state["pio.service.deployment"].path, "sync/scripts") + '"');
                             commands.push('echo "Calling \'postdeploy.sh\' on VM (cwd: ' + state["pio.service.deployment"].path + '):"');
                             // NOTE: When deploying as root we need to give the group write access to allow other processes to access the files.
