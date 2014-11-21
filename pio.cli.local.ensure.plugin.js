@@ -103,115 +103,139 @@ API.prototype._shutdown = function(graceful) {
     }
 }
 
-API.prototype._call = function(method, args) {
+API.prototype._call = function(method, args, options) {
 	var self = this;
-    if (!self._dnodeCanConnect && method !== "ping") {
-        return Q.resolve(null);
-    }
-    // Close the connection one second after last response if no
-    // more requests.
-    function startTimeout() {
-        if (self._dnodeTimeout) {
-            clearTimeout(self._dnodeTimeout);
+    options = options || {};
+
+    function callViaDnode() {
+        if (!self._dnodeCanConnect && method !== "ping") {
+            return Q.resolve(null);
         }
-        self._dnodeTimeout = setTimeout(function() {
-            return self._shutdown();
-        }, 1 * 1000);
-    }
-    function callRemote() {
-        var deferred = Q.defer();
-        var stderr = [];
-        var stdout = [];
-        var requestId = UUID.v4();
-        var stderrListener = function(_requestId, data) {
-            if (_requestId === requestId) {
-                stderr.push(data);
+        // Close the connection one second after last response if no
+        // more requests.
+        function startTimeout() {
+            if (self._dnodeTimeout) {
+                clearTimeout(self._dnodeTimeout);
             }
+            self._dnodeTimeout = setTimeout(function() {
+                return self._shutdown();
+            }, 1 * 1000);
         }
-        var stdoutListener = function(_requestId, data) {
-            if (_requestId === requestId) {
-                stdout.push(data);
-            }
-        }
-        self._dnodeEvents.on("stderr", stderrListener);
-        self._dnodeEvents.on("stdout", stdoutListener);
-        args.$requestId = requestId;
-        args.$authCode = self._settings.authCode;
-        if (!self._dnodeRemote[method]) {
-            deferred.reject(new Error("There is no remote method called '" + method + "'!"));
-        } else {
-            self._dnodeRemote[method](args, function (_err, response) {
-                self._dnodeEvents.removeListener("stderr", stderrListener);
-                self._dnodeEvents.removeListener("stdout", stdoutListener);
-                startTimeout();
-                if (_err) {
-                    if (_err.code === 403) {
-                        console.error(("Not authorized to access '" + self._settings.hostname + "' using dnode on port '" + self._settings.dnodePort + "'").red);
-                        return deferred.reject(new Error("Not authorized to access '" + self._settings.hostname + "' using dnode on port '" + self._settings.dnodePort + "'"));
-                    }
-                    var err = new Error("Got remote error: " + stderr.join(""));
-                    err.stack = _err.stack || null;
-                    return deferred.reject(err);
+        function callRemote() {
+            var deferred = Q.defer();
+            var stderr = [];
+            var stdout = [];
+            var requestId = UUID.v4();
+            var stderrListener = function(_requestId, data) {
+                if (_requestId === requestId) {
+                    stderr.push(data);
                 }
-                if (method === "_runCommands") {
-
-                    response = {
-                        code: response,
-                        stdout: stdout.join(""),
-                        stderr: stderr.join(""),
-                        objects: {}
-                    };
-
-                    // TODO: Parse output in `stdoutListener` using streaming capability: https://github.com/olado/doT/issues/114
-                    (function parse() {
-                        try {
-                            var re = /<wf\s+name\s*=\s*"([^"]+)"\s*>([\S\s]+?)<\s*\/wf\s*>/g;
-                            var m = null;
-                            while (m = re.exec(response.stdout)) {
-                                response.objects[m[1]] = JSON.parse(m[2]);
-                            }
-                        } catch(err) {
-                            return deferred.reject(err);
+            }
+            var stdoutListener = function(_requestId, data) {
+                if (_requestId === requestId) {
+                    stdout.push(data);
+                }
+            }
+            self._dnodeEvents.on("stderr", stderrListener);
+            self._dnodeEvents.on("stdout", stdoutListener);
+            args.$requestId = requestId;
+            args.$authCode = self._settings.authCode;
+            if (!self._dnodeRemote[method]) {
+                deferred.reject(new Error("There is no remote method called '" + method + "'!"));
+            } else {
+                self._dnodeRemote[method](args, function (_err, response) {
+                    self._dnodeEvents.removeListener("stderr", stderrListener);
+                    self._dnodeEvents.removeListener("stdout", stdoutListener);
+                    startTimeout();
+                    if (_err) {
+                        if (_err.code === 403) {
+                            console.error(("Not authorized to access '" + self._settings.hostname + "' using dnode on port '" + self._settings.dnodePort + "'").red);
+                            return deferred.reject(new Error("Not authorized to access '" + self._settings.hostname + "' using dnode on port '" + self._settings.dnodePort + "'"));
                         }
-                    })();
-                }
-                return deferred.resolve(response);
-            });
+                        var err = new Error("Got remote error: " + stderr.join(""));
+                        err.stack = _err.stack || null;
+                        return deferred.reject(err);
+                    }
+                    if (method === "_runCommands") {
+
+                        response = {
+                            code: response,
+                            stdout: stdout.join(""),
+                            stderr: stderr.join(""),
+                            objects: {}
+                        };
+
+                        // TODO: Parse output in `stdoutListener` using streaming capability: https://github.com/olado/doT/issues/114
+                        (function parse() {
+                            try {
+                                var re = /<wf\s+name\s*=\s*"([^"]+)"\s*>([\S\s]+?)<\s*\/wf\s*>/g;
+                                var m = null;
+                                while (m = re.exec(response.stdout)) {
+                                    response.objects[m[1]] = JSON.parse(m[2]);
+                                }
+                            } catch(err) {
+                                return deferred.reject(err);
+                            }
+                        })();
+                    }
+                    return deferred.resolve(response);
+                });
+            }
+            return deferred.promise;
         }
+        if (self._dnodeRemote) {
+            if (self._dnodeTimeout) {
+                clearTimeout(self._dnodeTimeout);
+                self._dnodeTimeout = null;
+            }
+            return callRemote();
+        }
+        var deferred = Q.defer();
+        self._dnodeClient = DNODE({
+            stdout: function(_requestId, data) {
+                self._dnodeEvents.emit("stdout", _requestId, new Buffer(data, "base64"));
+                process.stdout.write(new Buffer(data, "base64"));
+            },
+            stderr: function(_requestId, data) {
+                self._dnodeEvents.emit("stderr", _requestId, new Buffer(data, "base64"));
+                process.stderr.write(new Buffer(data, "base64"));
+            }
+        });
+        self._dnodeClient.on("error", function (err) {
+            //console.error("dnode error", err.stack);
+            return deferred.reject(err);
+        });
+        // TODO: Handle these failures better?
+        self._dnodeClient.on("fail", function (err) {
+            console.error("dnode fail", err.stack);
+        });
+        self._dnodeClient.on("remote", function (remote) {
+            self._dnodeRemote = remote;
+            return callRemote().then(deferred.resolve).fail(deferred.reject);
+        });
+        self._dnodeClient.connect(self._settings.dnodePort, self._settings.hostname);
         return deferred.promise;
     }
-    if (self._dnodeRemote) {
-        if (self._dnodeTimeout) {
-            clearTimeout(self._dnodeTimeout);
-            self._dnodeTimeout = null;
-        }
-        return callRemote();
+
+    function callViaSsh(pio) {
+        return pio.API.SSH.runRemoteCommands({
+            targetUser: pio._state["pio.vm"].user,
+            targetHostname: pio._state["pio.vm"].ip,
+            commands: args.commands,
+            workingDirectory: args.cwd,
+            keyPath: pio._state["pio"].keyPath
+        });
     }
-    var deferred = Q.defer();
-    self._dnodeClient = DNODE({
-        stdout: function(_requestId, data) {
-            self._dnodeEvents.emit("stdout", _requestId, new Buffer(data, "base64"));
-            process.stdout.write(new Buffer(data, "base64"));
-        },
-        stderr: function(_requestId, data) {
-            self._dnodeEvents.emit("stderr", _requestId, new Buffer(data, "base64"));
-            process.stderr.write(new Buffer(data, "base64"));
-        }
-    });
-    self._dnodeClient.on("error", function (err) {
-        //console.error("dnode error", err.stack);
-        return deferred.reject(err);
-    });
-    // TODO: Handle these failures better?
-    self._dnodeClient.on("fail", function (err) {
-        console.error("dnode fail", err.stack);
-    });
-    self._dnodeClient.on("remote", function (remote) {
-        self._dnodeRemote = remote;
-        return callRemote().then(deferred.resolve).fail(deferred.reject);
-    });
-    self._dnodeClient.connect(self._settings.dnodePort, self._settings.hostname);
-    return deferred.promise;
+
+    if (
+        method === "_runCommands" &&
+        options.transport === "ssh" &&
+        typeof options.pio !== "undefined"
+    ) {
+        return callViaSsh(options.pio);
+    }
+
+    return callViaDnode();
 }
 
 
