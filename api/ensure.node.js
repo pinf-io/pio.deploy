@@ -35,14 +35,17 @@ exports.forLib = function (LIB) {
                 'export SHELL="/bin/bash"',
                 'export BO_VERSION_NVM_NODE=' + process.env.BO_VERSION_NVM_NODE || '5',
                 '. "\\$HOME/.bash.origin"',
+                // TODO: If the source code (local or remote) for the source uri or its dependencies has changed we update
+                //       the remote install elegantly and seamlessly with versioned rollback.
                 'BO_callPlugin "bash.origin.provision@master" BO_Provision_ensureGitWorkingRepositoryAt "' + config.target.path + '" "' + config.source.url + '"',
                 'pushd "' + config.target.path + '"',
                 // TODO: Make installation more powerful.
+                '    git pull origin',
                 '    if [ -e "package.json" ]; then',
-                '        if [ ! -e ".installed" ]; then',
+                //'        if [ ! -e ".installed" ]; then',
                 '            BO_run_npm install --production',
                 '            touch ".installed"',
-                '        fi',
+                //'        fi',
                 '    fi',
                 'popd',
                 config.run.command,
