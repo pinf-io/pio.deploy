@@ -50,6 +50,7 @@ exports.forLib = function (LIB) {
                 'BO_resetLoaded',
                 config.run.command,
                 'popd',
+                'echo "Success!"',
              'EOF',
         ], {
             progress: true,
