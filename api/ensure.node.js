@@ -27,7 +27,7 @@ exports.forLib = function (LIB) {
                 'if ! which perl; then',
                 // TODO: Install these automatically when installing 'bash.origin.provision' where the
                 //       plugin declares the OS commands it needs.
-                '   sudo yum install -y perl unzip git',
+                '   sudo yum install -y perl unzip git gcc',
                 'fi',
                 'if [ ! -e "\\$HOME/.bash.origin" ]; then',
                 '    curl -s -o "\\$HOME/.bash.origin" "https://raw.githubusercontent.com/bash-origin/bash.origin/master/bash.origin?t=$(date +%s)"',
@@ -47,8 +47,9 @@ exports.forLib = function (LIB) {
                 '            touch ".installed"',
                 //'        fi',
                 '    fi',
-                'popd',
+                'BO_resetLoaded',
                 config.run.command,
+                'popd',
              'EOF',
         ], {
             progress: true,
