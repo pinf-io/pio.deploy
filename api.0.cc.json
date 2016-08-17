@@ -1,0 +1,7 @@
+{
+    "@": {
+        "io.pinf.pio.deploy/ensure/0": {
+            "$": "./api/ensure.cc.json"
+        }
+    }
+}
